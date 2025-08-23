@@ -1,0 +1,66 @@
+@import "tailwindcss";
+
+:root {
+  /* Colores basados en Artiq */
+  --theme-color: #ff1d1d;
+  --secondary-color: #ff9776;
+  --text-color: #6a6a6a;
+  --title-color: #111111;
+  --background: #ffffff;
+  --foreground: #111111;
+  --light-bg: #fafafb;
+  
+  /* Fuentes */
+  --font-title: 'Jost', sans-serif;
+  --font-text: 'Inter', sans-serif;
+}
+
+@theme inline {
+  --color-primary: var(--theme-color);
+  --color-secondary: var(--secondary-color);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-text: var(--text-color);
+  --color-title: var(--title-color);
+  --color-light-bg: var(--light-bg);
+  --font-sans: var(--font-text);
+  --font-title: var(--font-title);
+}
+
+body {
+  background: var(--background);
+  color: var(--text-color);
+  font-family: var(--font-text);
+  line-height: 1.75;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-title);
+  color: var(--title-color);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Smooth animations for all elements */
+* {
+  transition: all 0.3s ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--theme-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-color);
+}
