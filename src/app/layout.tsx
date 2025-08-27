@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Jost } from 'next/font/google';
 import "./globals.css";
 import { AppProvider } from "@/stores/AppContext";
+import { Toaster } from 'react-hot-toast';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className={`${inter.variable} ${jost.variable} antialiased`}>
         <AppProvider>
           {children}
+          <Toaster />
         </AppProvider>
       </body>
     </html>

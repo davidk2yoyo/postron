@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { PostContent } from '@/types';
+import { PostContent, Slide } from '@/types';
+import ImageEditor from './ImageEditor';
+import SlideEditor from './SlideEditor';
+import { ensureSlidesForPost, convertSlidesToSlideIdeas } from '@/utils/slideConverter';
 
 interface ContentPreviewProps {
   post: PostContent;
@@ -11,7 +14,10 @@ interface ContentPreviewProps {
 
 export default function ContentPreview({ post, onEdit, onPublish }: ContentPreviewProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [editedPost, setEditedPost] = useState<PostContent>(post);
+  const [editedPost, setEditedPost] = useState<PostContent>(ensureSlidesForPost(post));
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [showSlideEditor, setShowSlideEditor] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(post.status || 'generated');
 
   const handleSaveEdit = () => {
     onEdit(editedPost);
@@ -48,6 +54,48 @@ export default function ContentPreview({ post, onEdit, onPublish }: ContentPrevi
     }));
   };
 
+  const handleStatusUpdate = async (status: 'generated' | 'draft' | 'published') => {
+    setCurrentStatus(status);
+    // Update the post with new status
+    const updatedPost = { ...post, status };
+    onEdit(updatedPost);
+  };
+
+  const handleCreateImages = () => {
+    setShowImageEditor(true);
+  };
+
+  const handleEditSlides = () => {
+    setShowSlideEditor(true);
+  };
+
+  const handleSlidesChange = (slides: Slide[]) => {
+    const updatedPost = {
+      ...editedPost,
+      slides,
+      slide_ideas: convertSlidesToSlideIdeas(slides)
+    };
+    setEditedPost(updatedPost);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'generated': return 'bg-blue-100 text-blue-800';
+      case 'editing': return 'bg-yellow-100 text-yellow-800';
+      case 'published': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'generated': return '📝 Generado';
+      case 'editing': return '✏️ Editando';
+      case 'published': return '✅ Publicado';
+      default: return status;
+    }
+  };
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
       {/* Header */}
@@ -60,9 +108,14 @@ export default function ContentPreview({ post, onEdit, onPublish }: ContentPrevi
             <h3 className="text-xl font-semibold text-gray-900 font-title">
               Contenido Generado
             </h3>
-            <p className="text-sm text-gray-500">
-              {post.platform} • {post.postType}
-            </p>
+            <div className="flex items-center space-x-2">
+              <p className="text-sm text-gray-500">
+                {post.platform} • {post.postType}
+              </p>
+              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(currentStatus)}`}>
+                {getStatusText(currentStatus)}
+              </span>
+            </div>
           </div>
         </div>
         <div className="flex space-x-3">
@@ -87,14 +140,32 @@ export default function ContentPreview({ post, onEdit, onPublish }: ContentPrevi
                 onClick={() => setIsEditing(true)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200"
               >
-                ✏️ Editar
+                ✏️ Editar Texto
               </button>
-              <button
-                onClick={() => onPublish(post)}
-                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-400 text-white rounded-lg hover:from-green-600 hover:to-emerald-500 transition-all duration-200"
-              >
-                ✅ Aprobar y Publicar
-              </button>
+              {(post.postType === 'carousel' || post.slides) && (
+                <button
+                  onClick={handleEditSlides}
+                  className="px-4 py-2 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors duration-200"
+                >
+                  🎠 Editar Slides
+                </button>
+              )}
+              {currentStatus === 'generated' && (
+                <button
+                  onClick={handleCreateImages}
+                  className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors duration-200"
+                >
+                  🎨 Crear Imágenes
+                </button>
+              )}
+              {currentStatus === 'published' && (
+                <button
+                  onClick={() => onPublish(post)}
+                  className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-400 text-white rounded-lg hover:from-green-600 hover:to-emerald-500 transition-all duration-200"
+                >
+                  ✅ Publicar
+                </button>
+              )}
             </>
           )}
         </div>
@@ -124,8 +195,16 @@ export default function ContentPreview({ post, onEdit, onPublish }: ContentPrevi
         {/* Slide Ideas (only show if carousel or has slide ideas) */}
         {(post.postType === 'carousel' || post.slide_ideas.length > 0) && (
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              🎠 Ideas de Slides
+            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center justify-between">
+              <span>🎠 Ideas de Slides</span>
+              {!isEditing && (post.postType === 'carousel' || post.slides) && (
+                <button
+                  onClick={handleEditSlides}
+                  className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                >
+                  Editor Avanzado →
+                </button>
+              )}
             </label>
             {isEditing ? (
               <div className="space-y-2">
@@ -165,6 +244,14 @@ export default function ContentPreview({ post, onEdit, onPublish }: ContentPrevi
                     </li>
                   ))}
                 </ul>
+                {post.slides && post.slides.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <p className="text-sm text-blue-700">
+                      💡 Este contenido tiene {post.slides.length} slides diseñados. 
+                      Usa el editor avanzado para personalizar colores, tipografía y layouts.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -237,6 +324,39 @@ export default function ContentPreview({ post, onEdit, onPublish }: ContentPrevi
           )}
         </div>
       </div>
+      
+      {/* Slide Editor */}
+      {showSlideEditor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl max-w-7xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">Editor de Slides Avanzado</h2>
+              <button
+                onClick={() => setShowSlideEditor(false)}
+                className="text-gray-400 hover:text-gray-600 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="max-h-[80vh] overflow-hidden">
+              <SlideEditor
+                slides={editedPost.slides || []}
+                onSlidesChange={handleSlidesChange}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Editor */}
+      {showImageEditor && (
+        <div className="mt-8">
+          <ImageEditor
+            post={post}
+            onStatusUpdate={handleStatusUpdate}
+          />
+        </div>
+      )}
     </div>
   );
 }

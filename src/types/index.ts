@@ -1,9 +1,24 @@
 // Tipos principales de la aplicación
 
+export interface Slide {
+  id: string;
+  title: string;
+  content: string;
+  template: SlideTemplate;
+  backgroundColor?: string;
+  textColor?: string;
+  fontSize?: 'small' | 'medium' | 'large';
+  alignment?: 'left' | 'center' | 'right';
+  image?: string;
+}
+
+export type SlideTemplate = 'title' | 'content' | 'quote' | 'list' | 'image-text' | 'cta' | 'comparison' | 'stats';
+
 export interface PostContent {
   id: string;
   hook: string;
   slide_ideas: string[];
+  slides?: Slide[]; // New enhanced slides structure
   caption: string;
   CTA: string;
   hashtags: string[];
@@ -41,7 +56,7 @@ export type PostTone = 'professional' | 'casual' | 'funny' | 'inspiring' | 'urge
 
 export type PostLength = 'short' | 'medium' | 'long';
 
-export type PostStatus = 'draft' | 'generated' | 'approved' | 'published' | 'failed';
+export type PostStatus = 'draft' | 'generated' | 'published';
 
 export interface AppSettings {
   flowiseApiUrl: string;

@@ -1,6 +1,36 @@
 import { supabase, Database } from '@/lib/supabase';
 import { PostContent } from '@/types';
 
+// Asset types
+export interface Asset {
+  id: string;
+  post_id: string;
+  user_id: string;
+  kind: string;
+  url: string;
+  storage_path: string;
+  order_index: number;
+  width: number;
+  height: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Logo types
+export interface Logo {
+  id: string;
+  user_id: string;
+  name: string;
+  url: string;
+  storage_path: string;
+  width: number;
+  height: number;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Settings Service
 export class SettingsService {
   // Get current settings (we'll use the first/only row)
@@ -73,6 +103,7 @@ export class SettingsService {
 
 // Posts Service
 export class PostsService {
+  static readonly DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
   // Get all posts, newest first
   static async getAllPosts(): Promise<PostContent[]> {
     const { data, error } = await supabase
@@ -131,7 +162,7 @@ export class PostsService {
 
   // Update existing post
   static async updatePost(id: string, updates: Partial<PostContent>): Promise<PostContent> {
-    const dbUpdates = this.appPostToDbPost(updates as PostContent);
+    const dbUpdates = this.partialAppPostToDbPost(updates);
 
     const { data, error } = await supabase
       .from('posts')
@@ -227,8 +258,333 @@ export class PostsService {
       status: post.status,
       tone: (post as any).tone || null,
       length: (post as any).length || null,
-      original_idea: (post as any).originalIdea || null
+      original_idea: (post as any).originalIdea || null,
+      flowise_json: {
+        hook: post.hook,
+        slide_ideas: post.slide_ideas,
+        caption: post.caption,
+        CTA: post.CTA,
+        hashtags: post.hashtags
+      },
+      user_id: this.DEFAULT_USER_ID
     };
+  }
+
+  // Convert partial app post format to database format (for updates)
+  private static partialAppPostToDbPost(updates: Partial<PostContent>): Partial<Database['public']['Tables']['posts']['Update']> {
+    const dbUpdates: Partial<Database['public']['Tables']['posts']['Update']> = {};
+    
+    if (updates.hook !== undefined) dbUpdates.hook = updates.hook;
+    if (updates.slide_ideas !== undefined) dbUpdates.slide_ideas = updates.slide_ideas;
+    if (updates.caption !== undefined) dbUpdates.caption = updates.caption;
+    if (updates.CTA !== undefined) dbUpdates.cta = updates.CTA;
+    if (updates.hashtags !== undefined) dbUpdates.hashtags = updates.hashtags;
+    if (updates.platform !== undefined) dbUpdates.platform = updates.platform;
+    if (updates.postType !== undefined) dbUpdates.post_type = updates.postType;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if ((updates as any).tone !== undefined) dbUpdates.tone = (updates as any).tone;
+    if ((updates as any).length !== undefined) dbUpdates.length = (updates as any).length;
+    if ((updates as any).originalIdea !== undefined) dbUpdates.original_idea = (updates as any).originalIdea;
+    
+    // Update flowise_json only if relevant fields are being updated
+    if (updates.hook !== undefined || updates.slide_ideas !== undefined || updates.caption !== undefined || 
+        updates.CTA !== undefined || updates.hashtags !== undefined) {
+      dbUpdates.flowise_json = {
+        hook: updates.hook,
+        slide_ideas: updates.slide_ideas,
+        caption: updates.caption,
+        CTA: updates.CTA,
+        hashtags: updates.hashtags
+      };
+    }
+    
+    return dbUpdates;
+  }
+}
+
+// Assets Service
+export class AssetsService {
+  static readonly DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
+
+  // Get all assets for a post
+  static async getAssetsByPostId(postId: string): Promise<Asset[]> {
+    const { data, error } = await supabase
+      .from('assets')
+      .select('*')
+      .eq('post_id', postId)
+      .order('order_index', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching assets:', error);
+      throw new Error('Failed to load assets');
+    }
+
+    return data || [];
+  }
+
+  // Save new asset
+  static async createAsset(asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>): Promise<Asset> {
+    const { data, error } = await supabase
+      .from('assets')
+      .insert({
+        ...asset,
+        user_id: this.DEFAULT_USER_ID,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating asset:', error);
+      throw new Error('Failed to save asset');
+    }
+
+    return data;
+  }
+
+  // Update asset
+  static async updateAsset(id: string, updates: Partial<Asset>): Promise<Asset> {
+    const { data, error } = await supabase
+      .from('assets')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating asset:', error);
+      throw new Error('Failed to update asset');
+    }
+
+    return data;
+  }
+
+  // Delete asset
+  static async deleteAsset(id: string): Promise<void> {
+    const { error } = await supabase
+      .from('assets')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting asset:', error);
+      throw new Error('Failed to delete asset');
+    }
+  }
+
+  // Delete all assets for a post
+  static async deleteAssetsByPostId(postId: string): Promise<void> {
+    const { error } = await supabase
+      .from('assets')
+      .delete()
+      .eq('post_id', postId);
+
+    if (error) {
+      console.error('Error deleting assets:', error);
+      throw new Error('Failed to delete assets');
+    }
+  }
+
+  // Upload image to Supabase Storage
+  static async uploadImage(
+    file: File | Blob,
+    path: string
+  ): Promise<{ url: string; path: string }> {
+    const { data, error } = await supabase.storage
+      .from('assets')
+      .upload(path, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading to storage:', error);
+      throw new Error('Failed to upload image');
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('assets')
+      .getPublicUrl(data.path);
+
+    return {
+      url: publicUrl,
+      path: data.path,
+    };
+  }
+
+  // Convert data URL to blob for upload
+  static dataURLToBlob(dataURL: string): Blob {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)![1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    
+    return new Blob([u8arr], { type: mime });
+  }
+}
+
+// Logos Service
+export class LogosService {
+  static readonly DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
+
+  // Get all logos for the user
+  static async getUserLogos(): Promise<Logo[]> {
+    const { data, error } = await supabase
+      .from('logos')
+      .select('*')
+      .eq('user_id', this.DEFAULT_USER_ID)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching logos:', error);
+      throw new Error('Failed to load logos');
+    }
+
+    return data || [];
+  }
+
+  // Create new logo
+  static async createLogo(logo: Omit<Logo, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<Logo> {
+    const { data, error } = await supabase
+      .from('logos')
+      .insert({
+        ...logo,
+        user_id: this.DEFAULT_USER_ID,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating logo:', error);
+      throw new Error('Failed to save logo');
+    }
+
+    return data;
+  }
+
+  // Update logo
+  static async updateLogo(id: string, updates: Partial<Pick<Logo, 'name'>>): Promise<Logo> {
+    const { data, error } = await supabase
+      .from('logos')
+      .update(updates)
+      .eq('id', id)
+      .eq('user_id', this.DEFAULT_USER_ID)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating logo:', error);
+      throw new Error('Failed to update logo');
+    }
+
+    return data;
+  }
+
+  // Delete logo
+  static async deleteLogo(id: string): Promise<void> {
+    // First get the logo to get the storage path
+    const { data: logo, error: fetchError } = await supabase
+      .from('logos')
+      .select('storage_path')
+      .eq('id', id)
+      .eq('user_id', this.DEFAULT_USER_ID)
+      .single();
+
+    if (fetchError) {
+      console.error('Error fetching logo for deletion:', fetchError);
+      throw new Error('Failed to find logo');
+    }
+
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from('logos')
+      .remove([logo.storage_path]);
+
+    if (storageError) {
+      console.error('Error deleting from storage:', storageError);
+      // Continue with database deletion even if storage deletion fails
+    }
+
+    // Delete from database
+    const { error } = await supabase
+      .from('logos')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', this.DEFAULT_USER_ID);
+
+    if (error) {
+      console.error('Error deleting logo:', error);
+      throw new Error('Failed to delete logo');
+    }
+  }
+
+  // Upload logo to Supabase Storage
+  static async uploadLogo(
+    file: File,
+    name: string
+  ): Promise<{ url: string; path: string; width: number; height: number }> {
+    // Generate unique filename
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${this.DEFAULT_USER_ID}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+
+    // Upload to storage
+    const { data, error } = await supabase.storage
+      .from('logos')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      console.error('Error uploading logo to storage:', error);
+      throw new Error('Failed to upload logo');
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('logos')
+      .getPublicUrl(data.path);
+
+    // Get image dimensions
+    const dimensions = await this.getImageDimensions(file);
+
+    return {
+      url: publicUrl,
+      path: data.path,
+      width: dimensions.width,
+      height: dimensions.height,
+    };
+  }
+
+  // Get image dimensions from file (server-side fallback)
+  private static getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+    // Server-side fallback - return default dimensions
+    // TODO: Use a server-side image library like 'sharp' for real dimensions
+    return Promise.resolve({
+      width: 200,  // Default width
+      height: 200, // Default height
+    });
+  }
+
+  // Upload and create logo in one operation
+  static async uploadAndCreateLogo(file: File, name: string): Promise<Logo> {
+    const upload = await this.uploadLogo(file, name);
+    
+    const logo = await this.createLogo({
+      name,
+      url: upload.url,
+      storage_path: upload.path,
+      width: upload.width,
+      height: upload.height,
+      file_size: file.size,
+      mime_type: file.type,
+    });
+
+    return logo;
   }
 }
 

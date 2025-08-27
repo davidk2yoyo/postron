@@ -56,6 +56,8 @@ export type Database = {
           original_idea: string | null;
           created_at: string;
           updated_at: string;
+          flowise_json: any | null; // JSONB type - missing field
+          user_id: string; // missing field
         };
         Insert: {
           id?: string;
@@ -72,6 +74,8 @@ export type Database = {
           original_idea?: string | null;
           created_at?: string;
           updated_at?: string;
+          flowise_json?: any | null; // JSONB type - missing field
+          user_id?: string; // missing field
         };
         Update: {
           id?: string;
@@ -86,6 +90,49 @@ export type Database = {
           length?: string | null;
           status?: string;
           original_idea?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          flowise_json?: any | null; // JSONB type - missing field
+          user_id?: string; // missing field
+        };
+      };
+      logos: {
+        Row: {
+          id: string;
+          user_id: string;
+          name: string;
+          url: string;
+          storage_path: string;
+          width: number;
+          height: number;
+          file_size: number;
+          mime_type: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id?: string;
+          name: string;
+          url: string;
+          storage_path: string;
+          width: number;
+          height: number;
+          file_size: number;
+          mime_type: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          name?: string;
+          url?: string;
+          storage_path?: string;
+          width?: number;
+          height?: number;
+          file_size?: number;
+          mime_type?: string;
           created_at?: string;
           updated_at?: string;
         };

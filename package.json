@@ -9,10 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@hello-pangea/dnd": "^18.0.1",
     "@supabase/supabase-js": "^2.56.0",
+    "konva": "^9.3.22",
     "next": "15.5.0",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "react-hot-toast": "^2.6.0",
+    "react-konva": "^19.0.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
