@@ -142,6 +142,9 @@ export default function CanvasEditor({
   // Overlay properties
   const [overlayOpacity, setOverlayOpacity] = useState(0.3);
   const [overlayColor, setOverlayColor] = useState('#000000');
+  
+  // Tabs state for compact controls
+  const [activeTab, setActiveTab] = useState<'logos' | 'image' | 'text' | 'overlay'>('text');
 
   // Check if we're on client side
   useEffect(() => {
@@ -185,9 +188,10 @@ export default function CanvasEditor({
     const preset = CANVAS_PRESETS[selectedPreset];
     setCanvasSize(preset);
     
-    // Calculate scale to fit in viewport (max 400px height)
-    const maxDisplayHeight = 400;
-    const scale = Math.min(maxDisplayHeight / preset.height, 1);
+    // Calculate scale to fit in viewport - responsive scaling
+    const maxDisplayHeight = window.innerWidth < 768 ? 300 : window.innerWidth < 1024 ? 350 : 400;
+    const maxDisplayWidth = window.innerWidth < 768 ? window.innerWidth - 80 : window.innerWidth < 1024 ? 500 : 600;
+    const scale = Math.min(maxDisplayHeight / preset.height, maxDisplayWidth / preset.width, 1);
     setScaleToFit(scale);
     
     // Only set default text position if this is a new image (no existing position)
@@ -313,9 +317,9 @@ export default function CanvasEditor({
     ));
   };
 
-  // Export canvas as PNG
+  // Export canvas as PNG with proper download
   const handleExport = () => {
-    if (!stageRef.current || !onExport) return;
+    if (!stageRef.current) return;
 
     // Temporarily reset scale to 1 for export to get full resolution
     const originalScaleX = stageRef.current.scaleX();
@@ -334,7 +338,18 @@ export default function CanvasEditor({
     // Restore original scale for display
     stageRef.current.scale({ x: originalScaleX, y: originalScaleY });
 
-    onExport(dataURL);
+    // Create download link and trigger download
+    const link = document.createElement('a');
+    link.download = `post-tron-design-${Date.now()}.png`;
+    link.href = dataURL;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Also call onExport if provided for compatibility
+    if (onExport) {
+      onExport(dataURL);
+    }
   };
 
   // Expose export function to parent
@@ -379,27 +394,30 @@ export default function CanvasEditor({
 
   return (
     <div className="space-y-6">
-      {/* Canvas Preset Selector */}
-      <div className="flex gap-2 flex-wrap">
-        {Object.entries(CANVAS_PRESETS).map(([key, preset]) => (
-          <button
-            key={key}
-            onClick={() => setSelectedPreset(key as keyof typeof CANVAS_PRESETS)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
-              selectedPreset === key
-                ? 'bg-red-500 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {preset.name}
-          </button>
-        ))}
+      {/* Canvas Preset Selector - Mobile friendly */}
+      <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex gap-2 flex-wrap flex-1">
+          {Object.entries(CANVAS_PRESETS).map(([key, preset]) => (
+            <button
+              key={key}
+              onClick={() => setSelectedPreset(key as keyof typeof CANVAS_PRESETS)}
+              className={`px-3 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors duration-200 flex-1 sm:flex-none ${
+                selectedPreset === key
+                  ? 'bg-red-500 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className="block sm:inline">{preset.name}</span>
+              <span className="block sm:hidden text-xs opacity-75">{preset.width}×{preset.height}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Canvas Section */}
-        <div className="flex-1 max-w-3xl mx-auto lg:mx-0">
-          <div className="bg-gray-100 rounded-lg p-4 flex justify-center">
+      <div className="grid grid-cols-1 lg:grid-cols-4 xl:grid-cols-3 gap-4">
+        {/* Canvas Section - Responsive layout */}
+        <div className="lg:col-span-3 xl:col-span-2">
+          <div className="bg-gray-100 rounded-lg p-3 flex justify-center">
             <div 
               className="border border-gray-300 rounded-lg overflow-hidden shadow-lg"
               style={{
@@ -486,359 +504,401 @@ export default function CanvasEditor({
           </p>
         </div>
 
-        {/* Controls Panel - More Compact Layout */}
-        <div className="lg:w-96 xl:w-80 space-y-3">
-          {/* Logo Controls */}
-          {logos.length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
-              <h3 className="text-sm font-semibold mb-2">🏷️ Logos</h3>
-              
-              <div className="flex gap-2 mb-2">
-                <select
-                  value={selectedLogo}
-                  onChange={(e) => setSelectedLogo(e.target.value)}
-                  className="flex-1 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                >
-                  <option value="">Choose logo...</option>
-                  {logos.map((logo, index) => {
-                    const logoImg = logoImages[logo.url];
-                    // Only show logos that loaded successfully
-                    return (logoImg && logoImg.complete) ? (
-                      <option key={logo.url} value={logo.url}>
-                        {logo.name}
-                      </option>
-                    ) : null;
-                  })}
-                </select>
+        {/* Controls Panel - Tabbed Layout */}
+        <div className="lg:col-span-1 xl:col-span-1">
+          <div className="bg-white rounded-lg border border-gray-200 overflow-hidden sticky top-4">
+            {/* Tab Navigation */}
+            <div className="flex border-b border-gray-200 overflow-x-auto">
+              {[
+                { id: 'text', label: 'Text', icon: '✏️' },
+                { id: 'image', label: 'Image', icon: '🖼️' },
+                ...(logos.length > 0 ? [{ id: 'logos', label: 'Logos', icon: '🏷️' }] : []),
+                { id: 'overlay', label: 'Overlay', icon: '🎭' }
+              ].map((tab) => (
                 <button
-                  onClick={addLogo}
-                  disabled={!selectedLogo}
-                  className="px-2 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex-1 px-1.5 py-1.5 text-xs font-medium transition-colors duration-200 whitespace-nowrap min-w-0 ${
+                    activeTab === tab.id
+                      ? 'bg-red-500 text-white border-b-2 border-red-600'
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
+                  }`}
                 >
-                  Add
+                  <span className="mr-0.5 lg:mr-1">{tab.icon}</span>
+                  <span className="truncate">{tab.label}</span>
                 </button>
-              </div>
-              
-              {getCurrentPlacedLogos().length > 0 && (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Placed ({getCurrentPlacedLogos().length}):</p>
-                  <div className="flex flex-wrap gap-1">
-                    {getCurrentPlacedLogos().map((logo, index) => (
-                      <div key={logo.id} className="flex gap-0.5">
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-3 max-h-[65vh] overflow-y-auto">
+              {/* Logo Controls */}
+              {activeTab === 'logos' && logos.length > 0 && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Add Logo</label>
+                    <div className="flex gap-2">
+                      <select
+                        value={selectedLogo}
+                        onChange={(e) => setSelectedLogo(e.target.value)}
+                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                      >
+                        <option value="">Choose logo...</option>
+                        {logos.map((logo) => {
+                          const logoImg = logoImages[logo.url];
+                          return (logoImg && logoImg.complete) ? (
+                            <option key={logo.url} value={logo.url}>
+                              {logo.name}
+                            </option>
+                          ) : null;
+                        })}
+                      </select>
+                      <button
+                        onClick={addLogo}
+                        disabled={!selectedLogo}
+                        className="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {getCurrentPlacedLogos().length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Placed Logos ({getCurrentPlacedLogos().length})
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {getCurrentPlacedLogos().map((logo, index) => (
+                          <div key={logo.id} className="text-center">
+                            <button
+                              onClick={() => setSelectedLogoForControls(logo.id)}
+                              className={`w-full px-2 py-3 text-xs rounded-lg border-2 transition-colors duration-200 ${
+                                selectedLogoForControls === logo.id
+                                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                  : 'border-gray-200 bg-gray-50 text-gray-600 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="font-medium">Logo #{index + 1}</div>
+                              <div className="text-xs opacity-75">Click to edit</div>
+                            </button>
+                            <button
+                              onClick={() => removeLogo(logo.id)}
+                              className="w-full mt-1 px-2 py-1 bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-700 text-xs rounded transition-colors duration-200"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Logo Transform Controls */}
+                  {selectedLogoForControls && getSelectedLogo() && (
+                    <div className="border-t pt-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-3">Edit Selected Logo</label>
+                      
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Scale: {getSelectedLogo()!.scaleX.toFixed(2)}x
+                          </label>
+                          <input
+                            type="range"
+                            min="0.1"
+                            max="3"
+                            step="0.1"
+                            value={getSelectedLogo()!.scaleX}
+                            onChange={(e) => {
+                              const scale = Number(e.target.value);
+                              updateSelectedLogo({ scaleX: scale, scaleY: scale });
+                            }}
+                            className="w-full h-2"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">
+                            Rotation: {getSelectedLogo()!.rotation.toFixed(0)}°
+                          </label>
+                          <input
+                            type="range"
+                            min="-180"
+                            max="180"
+                            step="5"
+                            value={getSelectedLogo()!.rotation}
+                            onChange={(e) => {
+                              const rotation = Number(e.target.value);
+                              updateSelectedLogo({ rotation });
+                            }}
+                            className="w-full h-2"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2 mt-3">
                         <button
-                          onClick={() => setSelectedLogoForControls(logo.id)}
-                          className={`text-xs px-1.5 py-0.5 rounded transition-colors duration-200 ${
-                            selectedLogoForControls === logo.id
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
-                          title="Click to select for editing"
+                          onClick={() => {
+                            updateSelectedLogo({ scaleX: 0.2, scaleY: 0.2, rotation: 0 });
+                          }}
+                          className="flex-1 bg-gray-500 text-white py-2 rounded text-sm hover:bg-gray-600 transition-colors duration-200 font-medium"
                         >
-                          #{index + 1}
+                          Reset
                         </button>
                         <button
-                          onClick={() => removeLogo(logo.id)}
-                          className="text-xs bg-red-100 hover:bg-red-200 text-red-600 hover:text-red-700 px-1 py-0.5 rounded transition-colors duration-200"
-                          title="Click to remove"
+                          onClick={() => setSelectedLogoForControls('')}
+                          className="flex-1 bg-blue-500 text-white py-2 rounded text-sm hover:bg-blue-600 transition-colors duration-200 font-medium"
                         >
-                          ×
+                          Done
                         </button>
                       </div>
-                    ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Image Transform Controls */}
+              {activeTab === 'image' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">Image Controls</label>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Scale: {getCurrentImageTransform().scaleX.toFixed(2)}x
+                        </label>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="3"
+                          step="0.1"
+                          value={getCurrentImageTransform().scaleX}
+                          onChange={(e) => {
+                            const scale = Number(e.target.value);
+                            const newTransform = { ...getCurrentImageTransform(), scaleX: scale, scaleY: scale };
+                            setImageTransforms(prev => ({ ...prev, [backgroundImage]: newTransform }));
+                          }}
+                          className="w-full h-2"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">
+                          Rotation: {getCurrentImageTransform().rotation.toFixed(0)}°
+                        </label>
+                        <input
+                          type="range"
+                          min="-180"
+                          max="180"
+                          step="5"
+                          value={getCurrentImageTransform().rotation}
+                          onChange={(e) => {
+                            const rotation = Number(e.target.value);
+                            const newTransform = { ...getCurrentImageTransform(), rotation };
+                            setImageTransforms(prev => ({ ...prev, [backgroundImage]: newTransform }));
+                          }}
+                          className="w-full h-2"
+                        />
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        const resetTransform = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+                        setImageTransforms(prev => ({ ...prev, [backgroundImage]: resetTransform }));
+                      }}
+                      className="w-full bg-gray-500 text-white py-2 rounded text-sm hover:bg-gray-600 transition-colors duration-200 font-medium mt-3"
+                    >
+                      Reset Image Position
+                    </button>
                   </div>
                 </div>
               )}
-            </div>
-          )}
 
-          {/* Logo Transform Controls */}
-          {selectedLogoForControls && getSelectedLogo() && (
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
-              <h3 className="text-sm font-semibold mb-2">🎯 Logo Controls</h3>
-              
-              <div className="space-y-2">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Scale: {getSelectedLogo()!.scaleX.toFixed(2)}x
-                  </label>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="3"
-                    step="0.1"
-                    value={getSelectedLogo()!.scaleX}
-                    onChange={(e) => {
-                      const scale = Number(e.target.value);
-                      updateSelectedLogo({ scaleX: scale, scaleY: scale });
-                    }}
-                    className="w-full h-2"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Rotation: {getSelectedLogo()!.rotation.toFixed(0)}°
-                  </label>
-                  <input
-                    type="range"
-                    min="-180"
-                    max="180"
-                    step="5"
-                    value={getSelectedLogo()!.rotation}
-                    onChange={(e) => {
-                      const rotation = Number(e.target.value);
-                      updateSelectedLogo({ rotation });
-                    }}
-                    className="w-full h-2"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex gap-2 mt-2">
-                <button
-                  onClick={() => {
-                    updateSelectedLogo({ scaleX: 0.2, scaleY: 0.2, rotation: 0 });
-                  }}
-                  className="flex-1 bg-gray-500 text-white py-1 rounded text-xs hover:bg-gray-600 transition-colors duration-200 font-medium"
-                >
-                  Reset
-                </button>
-                <button
-                  onClick={() => setSelectedLogoForControls('')}
-                  className="flex-1 bg-blue-500 text-white py-1 rounded text-xs hover:bg-blue-600 transition-colors duration-200 font-medium"
-                >
-                  Deselect
-                </button>
-              </div>
-            </div>
-          )}
+              {/* Text Controls */}
+              {activeTab === 'text' && (
+                <div className="space-y-3">
+                  {/* Text Content */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Text Content
+                    </label>
+                    <textarea
+                      value={textContent}
+                      onChange={(e) => handleTextChange(e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent resize-none"
+                      rows={2}
+                      placeholder="Enter your text here..."
+                    />
+                  </div>
 
-          {/* Image Transform Controls */}
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold mb-2">🖼️ Image</h3>
-            
-            <div className="space-y-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Scale: {getCurrentImageTransform().scaleX.toFixed(2)}x
-                </label>
-                <input
-                  type="range"
-                  min="0.1"
-                  max="3"
-                  step="0.1"
-                  value={getCurrentImageTransform().scaleX}
-                  onChange={(e) => {
-                    const scale = Number(e.target.value);
-                    const newTransform = { ...getCurrentImageTransform(), scaleX: scale, scaleY: scale };
-                    setImageTransforms(prev => ({ ...prev, [backgroundImage]: newTransform }));
-                  }}
-                  className="w-full h-2"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Rotation: {getCurrentImageTransform().rotation.toFixed(0)}°
-                </label>
-                <input
-                  type="range"
-                  min="-180"
-                  max="180"
-                  step="5"
-                  value={getCurrentImageTransform().rotation}
-                  onChange={(e) => {
-                    const rotation = Number(e.target.value);
-                    const newTransform = { ...getCurrentImageTransform(), rotation };
-                    setImageTransforms(prev => ({ ...prev, [backgroundImage]: newTransform }));
-                  }}
-                  className="w-full h-2"
-                />
-              </div>
-            </div>
-            
-            <button
-              onClick={() => {
-                const resetTransform = { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
-                setImageTransforms(prev => ({ ...prev, [backgroundImage]: resetTransform }));
-              }}
-              className="w-full bg-gray-500 text-white py-1 rounded text-xs hover:bg-gray-600 transition-colors duration-200 font-medium mt-2"
-            >
-              Reset
-            </button>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold mb-2">✏️ Text</h3>
-            
-            {/* Text Content */}
-            <div className="mb-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Content
-              </label>
-              <textarea
-                value={textContent}
-                onChange={(e) => handleTextChange(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent resize-none"
-                rows={2}
-              />
-            </div>
-
-            {/* Font Size */}
-            <div className="mb-2">
-              <label className="block text-xs font-medium text-gray-600 mb-1">
-                Size: {fontSize}px
-              </label>
-              <input
-                type="range"
-                min="20"
-                max="120"
-                value={fontSize}
-                onChange={(e) => {
-                  const newSize = Number(e.target.value);
-                  setFontSize(newSize);
-                  handlePropertyChange({ fontSize: newSize });
-                }}
-                className="w-full h-2"
-              />
-            </div>
-
-            {/* Font Color & Alignment */}
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Color
-                </label>
-                <input
-                  type="color"
-                  value={fontColor}
-                  onChange={(e) => {
-                    const newColor = e.target.value;
-                    setFontColor(newColor);
-                    handlePropertyChange({ fontColor: newColor });
-                  }}
-                  className="w-full h-6 rounded border border-gray-300"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Align
-                </label>
-                <div className="flex gap-0.5">
-                  {(['left', 'center', 'right'] as const).map((align) => (
-                    <button
-                      key={align}
-                      onClick={() => {
-                        setTextAlign(align);
-                        handlePropertyChange({ textAlign: align });
+                  {/* Font Size */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      Font Size: {fontSize}px
+                    </label>
+                    <input
+                      type="range"
+                      min="20"
+                      max="120"
+                      value={fontSize}
+                      onChange={(e) => {
+                        const newSize = Number(e.target.value);
+                        setFontSize(newSize);
+                        handlePropertyChange({ fontSize: newSize });
                       }}
-                      className={`flex-1 px-1 py-0.5 rounded text-xs font-medium transition-colors duration-200 ${
-                        textAlign === align
-                          ? 'bg-red-500 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {align[0].toUpperCase()}
-                    </button>
-                  ))}
+                      className="w-full h-2"
+                    />
+                  </div>
+
+                  {/* Font Color & Alignment */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Color
+                      </label>
+                      <input
+                        type="color"
+                        value={fontColor}
+                        onChange={(e) => {
+                          const newColor = e.target.value;
+                          setFontColor(newColor);
+                          handlePropertyChange({ fontColor: newColor });
+                        }}
+                        className="w-full h-8 rounded border border-gray-300"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Alignment
+                      </label>
+                      <div className="flex gap-0.5">
+                        {(['left', 'center', 'right'] as const).map((align) => (
+                          <button
+                            key={align}
+                            onClick={() => {
+                              setTextAlign(align);
+                              handlePropertyChange({ textAlign: align });
+                            }}
+                            className={`flex-1 px-1.5 py-1 rounded text-xs font-medium transition-colors duration-200 ${
+                              textAlign === align
+                                ? 'bg-red-500 text-white'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {align[0].toUpperCase()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Font Family & Weight */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Font Family
+                      </label>
+                      <select
+                        value={fontFamily}
+                        onChange={(e) => {
+                          const newFamily = e.target.value;
+                          setFontFamily(newFamily);
+                          handlePropertyChange({ fontFamily: newFamily });
+                        }}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                      >
+                        {FONT_OPTIONS.map((font) => (
+                          <option key={font.value} value={font.value}>
+                            {font.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Weight
+                      </label>
+                      <select
+                        value={fontWeight}
+                        onChange={(e) => {
+                          const newWeight = e.target.value;
+                          setFontWeight(newWeight);
+                          handlePropertyChange({ fontWeight: newWeight });
+                        }}
+                        className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent"
+                      >
+                        <option value="normal">Normal</option>
+                        <option value="bold">Bold</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              )}
 
-            {/* Font Family & Weight */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Font
-                </label>
-                <select
-                  value={fontFamily}
-                  onChange={(e) => {
-                    const newFamily = e.target.value;
-                    setFontFamily(newFamily);
-                    handlePropertyChange({ fontFamily: newFamily });
-                  }}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent"
+              {/* Overlay Controls */}
+              {activeTab === 'overlay' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Overlay Settings</label>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                          Opacity: {Math.round(overlayOpacity * 100)}%
+                        </label>
+                        <input
+                          type="range"
+                          min="0"
+                          max="0.8"
+                          step="0.1"
+                          value={overlayOpacity}
+                          onChange={(e) => setOverlayOpacity(Number(e.target.value))}
+                          className="w-full h-2"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-600 mb-1.5">
+                          Color
+                        </label>
+                        <input
+                          type="color"
+                          value={overlayColor}
+                          onChange={(e) => setOverlayColor(e.target.value)}
+                          className="w-full h-8 rounded border border-gray-300"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Download Button */}
+              <div className="border-t pt-3 mt-4">
+                <button
+                  onClick={handleExport}
+                  disabled={!image}
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-4 rounded-lg hover:from-green-600 hover:to-green-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center justify-center gap-2"
                 >
-                  {FONT_OPTIONS.map((font) => (
-                    <option key={font.value} value={font.value}>
-                      {font.name}
-                    </option>
-                  ))}
-                </select>
+                  <span>📥</span>
+                  Download PNG
+                </button>
               </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Weight
-                </label>
-                <select
-                  value={fontWeight}
-                  onChange={(e) => {
-                    const newWeight = e.target.value;
-                    setFontWeight(newWeight);
-                    handlePropertyChange({ fontWeight: newWeight });
-                  }}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-red-500 focus:border-transparent"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="bold">Bold</option>
-                </select>
-              </div>
+              
+              {/* Export Button - Hidden but kept for batch capture functionality */}
+              <button
+                onClick={handleExport}
+                disabled={!image}
+                data-testid="export-button"
+                className="hidden"
+                style={{ display: 'none' }}
+              >
+                📥 Export PNG
+              </button>
             </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <h3 className="text-sm font-semibold mb-2">🎭 Overlay</h3>
-            
-            {/* Overlay Controls */}
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Opacity: {Math.round(overlayOpacity * 100)}%
-                </label>
-                <input
-                  type="range"
-                  min="0"
-                  max="0.8"
-                  step="0.1"
-                  value={overlayOpacity}
-                  onChange={(e) => setOverlayOpacity(Number(e.target.value))}
-                  className="w-full h-2"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Color
-                </label>
-                <input
-                  type="color"
-                  value={overlayColor}
-                  onChange={(e) => setOverlayColor(e.target.value)}
-                  className="w-full h-6 rounded border border-gray-300"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Export Button - Hidden but kept for batch capture functionality */}
-          <button
-            onClick={handleExport}
-            disabled={!image}
-            data-testid="export-button"
-            className="hidden"
-            style={{ display: 'none' }}
-          >
-            📥 Export PNG
-          </button>
-          
-          {/* Info about new export flow */}
-          <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-sm text-green-700 font-medium">
-              🚀 Use "Export All Slides" button above to export all slides at once!
-            </p>
           </div>
         </div>
       </div>
