@@ -255,7 +255,7 @@ export default function UnsplashSearch({ onImagesSelect, selectedImageIds = [], 
       {!isLoading && images.length === 0 && query && (
         <div className="text-center py-8 text-gray-500">
           <div className="text-4xl mb-2">🔍</div>
-          <p>No images found for "{query}"</p>
+          <p>No images found for &quot;{query}&quot;</p>
           <p className="text-sm">Try a different search term</p>
         </div>
       )}

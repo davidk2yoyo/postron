@@ -304,7 +304,7 @@ export default function GeneratePage() {
             </li>
             <li className="flex items-start">
               <span className="mr-2">•</span>
-              <span>Menciona tu audiencia objetivo (ej: "para emprendedores", "para padres")</span>
+              <span>Menciona tu audiencia objetivo (ej: &quot;para emprendedores&quot;, &quot;para padres&quot;)</span>
             </li>
             <li className="flex items-start">
               <span className="mr-2">•</span>
