@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import ContentPreview from '@/components/ContentPreview';
 import { useApp, actions } from '@/stores/AppContext';
 import { useServices, createPostFromResponse } from '@/utils/api';
@@ -121,8 +122,9 @@ export default function GeneratePage() {
     }
   };
   return (
-    <Layout title="Generar Post">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <ProtectedRoute>
+      <Layout title="Generar Post">
+        <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div className="text-center">
           <h2 className="text-3xl font-bold text-gray-900 mb-4 font-title">
@@ -323,7 +325,8 @@ export default function GeneratePage() {
             onPublish={handlePublishPost}
           />
         )}
-      </div>
-    </Layout>
+        </div>
+      </Layout>
+    </ProtectedRoute>
   );
 }

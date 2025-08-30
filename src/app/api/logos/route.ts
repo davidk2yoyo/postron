@@ -9,7 +9,7 @@ export async function GET() {
   } catch (error) {
     console.error('API Error fetching logos:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch logos' },
+      { error: 'Failed to fetch logos', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }

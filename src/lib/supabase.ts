@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
 // Supabase configuration
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -10,8 +11,18 @@ if (!supabaseUrl || !supabaseAnonKey || supabaseUrl === 'your_supabase_project_u
   throw new Error('Missing Supabase environment variables. Please check your .env.local file.');
 }
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create Supabase client (for server-side and general use)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true
+  }
+});
+
+// Create browser client for client-side auth
+export const createClient_ = () => {
+  return createBrowserClient(supabaseUrl!, supabaseAnonKey!);
+};
 
 // Database types for TypeScript
 export type Database = {
@@ -22,6 +33,7 @@ export type Database = {
           id: string;
           flowise_api_url: string | null;
           n8n_webhook_url: string | null;
+          user_id: string;
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +41,7 @@ export type Database = {
           id?: string;
           flowise_api_url?: string | null;
           n8n_webhook_url?: string | null;
+          user_id?: string;
           created_at?: string;
           updated_at?: string;
         };
@@ -36,6 +49,7 @@ export type Database = {
           id?: string;
           flowise_api_url?: string | null;
           n8n_webhook_url?: string | null;
+          user_id?: string;
           created_at?: string;
           updated_at?: string;
         };

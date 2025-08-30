@@ -1,0 +1,19 @@
+{
+  "images": [
+    {
+      "dataURL": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==",
+      "width": 800,
+      "height": 600
+    }
+  ],
+  "postData": {
+    "id": "01234567-89ab-cdef-0123-456789abcdef",
+    "hook": "Test hook",
+    "slide_ideas": ["Test slide"],
+    "caption": "Test caption",
+    "cta": "Test CTA",
+    "hashtags": ["#test"],
+    "platform": "instagram",
+    "post_type": "post"
+  }
+}

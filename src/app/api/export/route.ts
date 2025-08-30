@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AssetsService, SettingsService } from '@/services/database';
+import { supabase } from '@/lib/supabase';
 
 interface ExportRequest {
   images: {
@@ -21,6 +22,16 @@ interface ExportRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    // For single-user app, use fallback authentication like other services
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
     const { images, postData }: ExportRequest = await request.json();
     if (!images || !images.length || !postData) {
       return NextResponse.json(
@@ -60,10 +71,10 @@ export async function POST(request: NextRequest) {
       const { url, path } = await AssetsService.uploadImage(blob, storagePath);
       uploadedImages.push(url);
       
-      // Create asset record in database
+      // Create asset record in database (use null for post_id if post doesn't exist)
       const asset = await AssetsService.createAsset({
-        post_id: postData.id,
-        user_id: AssetsService.DEFAULT_USER_ID,
+        post_id: null, // Export assets don't need to be linked to posts
+        user_id: userId,
         kind: 'export',
         url: url,
         storage_path: path,

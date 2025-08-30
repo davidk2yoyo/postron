@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useApp } from '@/stores/AppContext';
 import { PostContent, SocialPlatform, PostStatus } from '@/types';
 
@@ -95,8 +96,9 @@ export default function Home() {
   };
 
   return (
-    <Layout title="Dashboard">
-      <div className="space-y-6">
+    <ProtectedRoute>
+      <Layout title="Dashboard">
+        <div className="space-y-6">
         {/* Welcome Section */}
         <div className="bg-gradient-to-r from-red-500 to-orange-400 rounded-xl p-8 text-white relative overflow-hidden">
           <div className="relative z-10">
@@ -324,7 +326,8 @@ export default function Home() {
             )}
           </div>
         </div>
-      </div>
-    </Layout>
+        </div>
+      </Layout>
+    </ProtectedRoute>
   );
 }

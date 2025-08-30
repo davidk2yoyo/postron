@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useApp, actions } from '@/stores/AppContext';
 import { Logo } from '@/services/database';
 
@@ -171,8 +172,9 @@ export default function SettingsPage() {
     }));
   };
   return (
-    <Layout title="Configuración">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <ProtectedRoute>
+      <Layout title="Configuración">
+        <div className="max-w-4xl mx-auto space-y-8">
         {/* Logo Management - Separate from main form */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-xl font-semibold text-gray-900 mb-4 font-title">
@@ -502,7 +504,8 @@ export default function SettingsPage() {
             </button>
           </div>
         </form>
-      </div>
-    </Layout>
+        </div>
+      </Layout>
+    </ProtectedRoute>
   );
 }

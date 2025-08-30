@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Jost } from 'next/font/google';
 import "./globals.css";
 import { AppProvider } from "@/stores/AppContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import { Toaster } from 'react-hot-toast';
 
 const inter = Inter({
@@ -27,10 +28,12 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={`${inter.variable} ${jost.variable} antialiased`}>
-        <AppProvider>
-          {children}
-          <Toaster />
-        </AppProvider>
+        <AuthProvider>
+          <AppProvider>
+            {children}
+            <Toaster />
+          </AppProvider>
+        </AuthProvider>
       </body>
     </html>
   );

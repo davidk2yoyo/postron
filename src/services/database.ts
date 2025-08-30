@@ -33,11 +33,21 @@ export interface Logo {
 
 // Settings Service
 export class SettingsService {
-  // Get current settings (we'll use the first/only row)
+  // Get current user's settings
   static async getSettings() {
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
     const { data, error } = await supabase
       .from('settings')
       .select('*')
+      .eq('user_id', userId)
       .limit(1)
       .single();
 
@@ -53,12 +63,22 @@ export class SettingsService {
     };
   }
 
-  // Update settings
+  // Update current user's settings
   static async updateSettings(flowiseUrl: string, n8nUrl: string) {
-    // First, try to get existing settings
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
+    // First, try to get existing settings for this user
     const { data: existing } = await supabase
       .from('settings')
       .select('id')
+      .eq('user_id', userId)
       .limit(1)
       .single();
 
@@ -81,12 +101,13 @@ export class SettingsService {
 
       return data;
     } else {
-      // Create new row if none exists
+      // Create new row if none exists for this user
       const { data, error } = await supabase
         .from('settings')
         .insert({
           flowise_api_url: flowiseUrl || null,
-          n8n_webhook_url: n8nUrl || null
+          n8n_webhook_url: n8nUrl || null,
+          user_id: userId
         })
         .select()
         .single();
@@ -103,12 +124,17 @@ export class SettingsService {
 
 // Posts Service
 export class PostsService {
-  static readonly DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
   // Get all posts, newest first
   static async getAllPosts(): Promise<PostContent[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -122,10 +148,16 @@ export class PostsService {
 
   // Get single post by ID
   static async getPostById(id: string): Promise<PostContent | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (error) {
@@ -139,8 +171,13 @@ export class PostsService {
 
   // Save new post
   static async createPost(post: PostContent): Promise<PostContent> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     console.log('Creating post with data:', post);
-    const dbPost = this.appPostToDbPost(post);
+    const dbPost = this.appPostToDbPost(post, user.id);
     console.log('Transformed to DB format:', dbPost);
 
     const { data, error } = await supabase
@@ -162,12 +199,18 @@ export class PostsService {
 
   // Update existing post
   static async updatePost(id: string, updates: Partial<PostContent>): Promise<PostContent> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const dbUpdates = this.partialAppPostToDbPost(updates);
 
     const { data, error } = await supabase
       .from('posts')
       .update(dbUpdates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -181,10 +224,16 @@ export class PostsService {
 
   // Delete post
   static async deletePost(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { error } = await supabase
       .from('posts')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error deleting post:', error);
@@ -194,10 +243,16 @@ export class PostsService {
 
   // Get posts by platform
   static async getPostsByPlatform(platform: string): Promise<PostContent[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .select('*')
       .eq('platform', platform)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -210,10 +265,16 @@ export class PostsService {
 
   // Get posts by status
   static async getPostsByStatus(status: string): Promise<PostContent[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('posts')
       .select('*')
       .eq('status', status)
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -245,7 +306,7 @@ export class PostsService {
   }
 
   // Convert app post format to database format
-  private static appPostToDbPost(post: PostContent): Database['public']['Tables']['posts']['Insert'] {
+  private static appPostToDbPost(post: PostContent, userId: string): Database['public']['Tables']['posts']['Insert'] {
     return {
       // Let database generate UUID automatically - don't include id
       hook: post.hook,
@@ -266,7 +327,7 @@ export class PostsService {
         CTA: post.CTA,
         hashtags: post.hashtags
       },
-      user_id: this.DEFAULT_USER_ID
+      user_id: userId
     };
   }
 
@@ -304,14 +365,18 @@ export class PostsService {
 
 // Assets Service
 export class AssetsService {
-  static readonly DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
-
   // Get all assets for a post
   static async getAssetsByPostId(postId: string): Promise<Asset[]> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('assets')
       .select('*')
       .eq('post_id', postId)
+      .eq('user_id', user.id)
       .order('order_index', { ascending: true });
 
     if (error) {
@@ -324,11 +389,20 @@ export class AssetsService {
 
   // Save new asset
   static async createAsset(asset: Omit<Asset, 'id' | 'created_at' | 'updated_at'>): Promise<Asset> {
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
     const { data, error } = await supabase
       .from('assets')
       .insert({
         ...asset,
-        user_id: this.DEFAULT_USER_ID,
+        user_id: userId,
       })
       .select()
       .single();
@@ -343,10 +417,16 @@ export class AssetsService {
 
   // Update asset
   static async updateAsset(id: string, updates: Partial<Asset>): Promise<Asset> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { data, error } = await supabase
       .from('assets')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single();
 
@@ -360,10 +440,16 @@ export class AssetsService {
 
   // Delete asset
   static async deleteAsset(id: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { error } = await supabase
       .from('assets')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error deleting asset:', error);
@@ -373,10 +459,16 @@ export class AssetsService {
 
   // Delete all assets for a post
   static async deleteAssetsByPostId(postId: string): Promise<void> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const { error } = await supabase
       .from('assets')
       .delete()
-      .eq('post_id', postId);
+      .eq('post_id', postId)
+      .eq('user_id', user.id);
 
     if (error) {
       console.error('Error deleting assets:', error);
@@ -429,14 +521,21 @@ export class AssetsService {
 
 // Logos Service
 export class LogosService {
-  static readonly DEFAULT_USER_ID = '00000000-0000-0000-0000-000000000000';
-
   // Get all logos for the user
   static async getUserLogos(): Promise<Logo[]> {
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8'; // Fallback to your user ID for API routes
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8'; // Use your user ID when auth context is unavailable
+    }
+
     const { data, error } = await supabase
       .from('logos')
       .select('*')
-      .eq('user_id', this.DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -449,11 +548,20 @@ export class LogosService {
 
   // Create new logo
   static async createLogo(logo: Omit<Logo, 'id' | 'user_id' | 'created_at' | 'updated_at'>): Promise<Logo> {
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
     const { data, error } = await supabase
       .from('logos')
       .insert({
         ...logo,
-        user_id: this.DEFAULT_USER_ID,
+        user_id: userId,
       })
       .select()
       .single();
@@ -468,11 +576,20 @@ export class LogosService {
 
   // Update logo
   static async updateLogo(id: string, updates: Partial<Pick<Logo, 'name'>>): Promise<Logo> {
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
     const { data, error } = await supabase
       .from('logos')
       .update(updates)
       .eq('id', id)
-      .eq('user_id', this.DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .select()
       .single();
 
@@ -486,12 +603,21 @@ export class LogosService {
 
   // Delete logo
   static async deleteLogo(id: string): Promise<void> {
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
     // First get the logo to get the storage path
     const { data: logo, error: fetchError } = await supabase
       .from('logos')
       .select('storage_path')
       .eq('id', id)
-      .eq('user_id', this.DEFAULT_USER_ID)
+      .eq('user_id', userId)
       .single();
 
     if (fetchError) {
@@ -514,7 +640,7 @@ export class LogosService {
       .from('logos')
       .delete()
       .eq('id', id)
-      .eq('user_id', this.DEFAULT_USER_ID);
+      .eq('user_id', userId);
 
     if (error) {
       console.error('Error deleting logo:', error);
@@ -527,9 +653,18 @@ export class LogosService {
     file: File,
     name: string
   ): Promise<{ url: string; path: string; width: number; height: number }> {
+    let userId: string;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id || '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    } catch {
+      userId = '01d499fc-c3c4-4b5d-8928-e21389b548d8';
+    }
+
     // Generate unique filename
     const fileExt = file.name.split('.').pop();
-    const fileName = `${this.DEFAULT_USER_ID}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
     // Upload to storage
     const { data, error } = await supabase.storage

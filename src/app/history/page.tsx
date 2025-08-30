@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Layout from '@/components/Layout';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { useApp } from '@/stores/AppContext';
 import { PostContent, SocialPlatform, PostStatus } from '@/types';
 
@@ -181,8 +182,9 @@ ${post.hashtags.join(', ')}`;
   };
 
   return (
-    <Layout title="Historial">
-      <div className="space-y-6">
+    <ProtectedRoute>
+      <Layout title="Historial">
+        <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
@@ -550,7 +552,8 @@ ${post.hashtags.join(', ')}`;
             </div>
           </div>
         )}
-      </div>
-    </Layout>
+        </div>
+      </Layout>
+    </ProtectedRoute>
   );
 }
